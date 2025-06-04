@@ -1439,6 +1439,66 @@ func TestConnection0RTTTransportParameters(t *testing.T) {
 	}
 }
 
+func TestConnectionPing(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	sph := mockackhandler.NewMockSentPacketHandler(mockCtrl)
+	tc := newServerTestConnection(t,
+		mockCtrl,
+		nil,
+		false,
+		connectionOptSentPacketHandler(sph),
+		connectionOptHandshakeConfirmed(),
+	)
+
+	// Set up expectations for packet handling
+	// This is required because the Ping() triggers packet sending
+	sph.EXPECT().GetLossDetectionTimeout().Return(time.Now().Add(time.Hour)).AnyTimes()
+	sph.EXPECT().SendMode(gomock.Any()).Return(ackhandler.SendAny).AnyTimes()
+	sph.EXPECT().ECNMode(gomock.Any()).Return(protocol.ECNNon).AnyTimes()
+
+	// Verify a packet containing a PING frame is sent
+	var pingFrameSent bool
+	sph.EXPECT().SentPacket(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())
+	tc.packer.EXPECT().AppendPacket(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(buf *packetBuffer, _ protocol.ByteCount, _ time.Time, _ protocol.Version) (shortHeaderPacket, error) {
+			// Simulate adding a packet with a PING frame
+			packet := shortHeaderPacket{
+				Frames: []ackhandler.Frame{{Frame: &wire.PingFrame{}}},
+			}
+			pingFrameSent = true
+			return packet, nil
+		},
+	).Times(1)
+
+	// Add expectation for any subsequent calls to AppendPacket
+	tc.packer.EXPECT().AppendPacket(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		shortHeaderPacket{}, errNothingToPack,
+	).AnyTimes()
+
+	tc.sendConn.EXPECT().Write(gomock.Any(), gomock.Any(), gomock.Any())
+
+	// Start the connection
+	errChan := make(chan error, 1)
+	go func() { errChan <- tc.conn.run() }()
+
+	// Trigger the Ping function and wait for processing
+	tc.conn.Ping()
+	time.Sleep(scaleDuration(50 * time.Millisecond))
+
+	// Verify the PING frame was sent
+	require.True(t, pingFrameSent, "PING frame was not sent")
+
+	// Test teardown
+	tc.connRunner.EXPECT().Remove(gomock.Any()).AnyTimes()
+	tc.conn.destroy(nil)
+	select {
+	case err := <-errChan:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("timeout")
+	}
+}
+
 func TestConnectionReceivePrioritization(t *testing.T) {
 	t.Run("handshake complete", func(t *testing.T) {
 		events := testConnectionReceivePrioritization(t, true, 5)

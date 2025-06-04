@@ -133,6 +133,9 @@ type Connection interface {
 	ReceiveDatagram(context.Context) ([]byte, error)
 
 	AddPath(*Transport) (*Path, error)
+
+	// Ping sends a PING frame to the peer.
+	Ping()
 }
 
 // An EarlyConnection is a connection that is handshaking.

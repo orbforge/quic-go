@@ -158,6 +158,36 @@ func (c *MockQUICConnAddPathCall) DoAndReturn(f func(*Transport) (*Path, error))
 	return c
 }
 
+// Ping mocks base method.
+func (m *MockQUICConn) Ping() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Ping")
+}
+
+// Ping indicates an expected call of Ping.
+func (mr *MockQUICConnMockRecorder) Ping() *MockQUICConnPingCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockQUICConn)(nil).Ping))
+	return &MockQUICConnPingCall{Call: call}
+}
+
+// MockQUICConnPingCall wrap *gomock.Call
+type MockQUICConnPingCall struct {
+	*gomock.Call
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockQUICConnPingCall) Do(f func()) *MockQUICConnPingCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockQUICConnPingCall) DoAndReturn(f func()) *MockQUICConnPingCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CloseWithError mocks base method.
 func (m *MockQUICConn) CloseWithError(arg0 ApplicationErrorCode, arg1 string) error {
 	m.ctrl.T.Helper()
